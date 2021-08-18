@@ -1,4 +1,3 @@
-import {RoomStore, SocketStore} from "../@types/data";
 import {ApplicationError} from "../error/ApplicationError";
 import {
   ClientRoomData,
@@ -6,13 +5,19 @@ import {
   CreateRoomRequest,
   DeleteRoomRequest,
   GetRoomListResponse,
+  MediaStore,
   RoomLoginRequest,
-  RoomLoginResponse
+  RoomLoginResponse,
+  RoomStore,
+  SocketStore,
+  StoreData,
+  UserLoginRequest,
+  UserLoginResponse,
+  UserStore
 } from "../index";
 import {hash, verify} from "../password";
 import {compareVersion} from "../_GitHub";
 import {SystemError} from "../error/SystemError";
-import {UserLoginRequest, UserLoginResponse} from "../@types/socket";
 
 export async function roomApiDeleteRoomDelegate(
   core: Core,
@@ -256,7 +261,7 @@ export async function roomApiCreateRoomDelegate(
   if (data.data) throw new ApplicationError("Already created room.");
 
   const failure = async (message: string): Promise<void> => {
-    await core._dbInner.dbDeleteOne(arg.roomKey, socket, collection);
+    await core._dbInner.dbDeleteOne(arg.roomKey, collection);
     await core.socket.emitSocketEvent(
       socket,
       "all",
@@ -357,7 +362,7 @@ export async function roomApiTouchRoomDelegate(
     createTime: new Date(),
     updateTime: null,
     data: null
-  }, socket, core.COLLECTION_ROOM);
+  }, core.COLLECTION_ROOM);
 
   await core.socket.emitSocketEvent<ClientRoomData>(
     socket,

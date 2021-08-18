@@ -14,8 +14,189 @@ import {
 import commonSocketApiFuncMap from "./_SocketApi";
 import {Db} from "mongodb";
 import * as Minio from "minio";
-import {readText, readYaml} from "./util";
-import {TargetClient} from "./_GitHub";
+import * as YAML from "yaml";
+import * as fs from "fs";
+import {compareVersion, TargetClient} from "./_GitHub";
+import {SystemError} from "./error/SystemError";
+const crypto = require("crypto");
+
+export type RoomStore = {
+  name: string;
+  bcdiceServer: string;
+  bcdiceVersion: string;
+  system: string;
+  extend?: RoomInfoExtend; // 一時的措置
+  memberNum: number;
+  roomCollectionPrefix: string;
+  storageId: string;
+  roomPassword?: string;
+};
+
+export type TokenStore = {
+  type: "server" | "room" | "user";
+  token: string;
+  roomCollectionPrefix: string | null;
+  roomNo: number | null;
+  storageId: string | null;
+  userKey: string | null;
+  expires: Date;
+}
+
+export type SocketStore = {
+  socketId: string;
+  roomKey: string | null;
+  roomNo: number | null;
+  roomCollectionPrefix: string | null;
+  storageId: string | null;
+  userKey: string | null;
+  connectTime: Date;
+}
+export type IconClass =
+  | "icon-warning"
+  | "icon-youtube2"
+  | "icon-image"
+  | "icon-music"
+  | "icon-text";
+
+export type UrlType = "youtube" | "image" | "music" | "setting" | "unknown";
+
+/**
+ * 部屋の追加情報
+ */
+export type RoomInfoExtend = {
+  visitable: boolean; // 見学許可
+  isFitGrid: boolean; // マップオブジェクトをセルに自動調整するか
+  isViewDice: boolean; // ダイスを表示するか
+  isViewCutIn: boolean; // カットインを表示するか
+  isDrawGridId: boolean; // マップ座標を表示するか
+  mapRotatable: boolean; // マップを回転させるか
+  isShowStandImage: boolean; // 立ち絵を表示するか,
+  standImageGridNum: number; // 立ち絵を表示する位置の数
+  isShowRotateMarker: boolean; // マップオブジェクトの回転マーカーを表示するか
+  windowSettings: WindowSettings;
+};
+
+export type WindowSetting =
+  | "not-use" // 使えなくします
+  | "free" // 特に指定はありません
+  | "init-view" // 入室時に表示します
+  | "always-open"; // 常に開いています。閉じることはできません。
+
+export type WindowSettings = {
+  chat: WindowSetting;
+  initiative: WindowSetting;
+  "chat-palette": WindowSetting;
+  "counter-remocon": WindowSetting;
+};
+
+export type UserType = "gm" | "pl" | "visitor";
+
+export type UserLoginRequest = {
+  name: string;
+  password: string;
+  type?: UserType;
+};
+
+export type UserLoginResponse = {
+  userKey: string;
+  token: string;
+}
+
+export type UploadMediaInfo = MediaStore & { key?: string } & (
+  | { dataLocation: "direct" }
+  | {
+  dataLocation: "server";
+  blob?: Blob;
+  arrayBuffer?: string;
+}
+  );
+
+export type MediaStore = {
+  name: string;
+  rawPath: string;
+  hash: string;
+  mediaFileId: string;
+  tag: string;
+  url: string;
+  urlType: UrlType;
+  iconClass: IconClass;
+  imageSrc: string;
+  dataLocation: "server" | "direct";
+};
+
+/**
+ * userCCのデータ定義
+ * ユーザ1人に関する情報
+ */
+export type UserStore = {
+  name: string;
+  type: UserType;
+  login: number;
+  password: string;
+  isExported: boolean;
+  token: string;
+};
+/**
+ * DBに格納されるデータのラッパー
+ */
+export type DataReference = {
+  type: string | null;
+  key: string | null;
+};
+
+export type StoreData<T> = {
+  _id?: any;
+  collection: string;
+  key: string;
+  order: number;
+  ownerType: string | null;
+  owner: string | null; // 部屋データに含まれるデータのオーナー。部屋データにはオーナーは存在しない
+  permission: Permission | null; // 通常はnullではない
+  status:
+    | "initial-touched"
+    | "added"
+    | "modified";
+  createTime: Date;
+  updateTime: Date | null;
+  refList: DataReference[]; // このデータへの参照
+  data?: T;
+};
+
+/**
+ * 権限対象の種別
+ */
+export type PermissionNodeType = "group" | "actor" | "owner";
+
+/**
+ * 権限対象1件の表現
+ */
+export type PermissionNode = {
+  type: PermissionNodeType;
+  key?: string;
+};
+
+/**
+ * 権限のルールタイプ
+ */
+export type PermissionRuleType = "none" | "allow" | "deny";
+
+/**
+ * 権限のルール単位の表現
+ */
+export type PermissionRule = {
+  type: PermissionRuleType;
+  list: PermissionNode[];
+};
+
+/**
+ * 表示・編集・権限編集の3種の権限の集合体。
+ * これがDBデータ1件ごとに設定される
+ */
+export type Permission = {
+  view: PermissionRule;
+  edit: PermissionRule;
+  chmod: PermissionRule;
+};
 
 export interface Core {
   COLLECTION_ROOM: SystemCollection;
@@ -49,7 +230,7 @@ export type AddDirectRequest<T> = {
   force: boolean;
 };
 
-export type DeleteDataRequest<T> = {
+export type DeleteDataRequest = {
   collectionSuffix: string;
   share: "room" | "room-mate" | "all";
   list: string[];
@@ -273,4 +454,46 @@ export default async function bootUp(
   }, 1000 * 60 * 5); // 5分
 
   console.log(`Quoridorn Server is Ready. (version: ${process.env.npm_package_version})`);
+}
+
+export function readText(path: string): string {
+  return fs.readFileSync(path, "utf8");
+}
+
+export function readYaml<T>(path: string): T {
+  return YAML.parse(readText(path)) as T;
+}
+
+export function getFileHash(arrayBuffer: ArrayBuffer | string) {
+  return crypto.createHash('sha512').update(arrayBuffer).digest('hex');
+}
+
+export async function getTargetClient(
+  process: NodeJS.Process,
+  interoperabilityYamlPath: string
+): Promise<TargetClient> {
+  if (!process.env.npm_package_version) {
+    throw new SystemError(`The version is not set in package.json.`);
+  }
+  const version: string = `Quoridorn ${process.env.npm_package_version.replace("-", "")}`;
+  const targetClient: TargetClient = { from: null, to: null }
+  const iList: Interoperability[] = readYaml(interoperabilityYamlPath);
+  if (compareVersion(iList[0].server, version) <= 0) {
+    // サーバが最新系
+    targetClient.from = iList[0].client;
+  } else {
+    // サーバは最新系ではない
+    iList.forEach((i, index) => {
+      if (!index) return;
+      if (
+        compareVersion(iList[index - 1].server, version) > 0 &&
+        compareVersion(i.server, version) <= 0
+      ) {
+        targetClient.from = i.client;
+        targetClient.to = iList[index - 1].client;
+      }
+    });
+  }
+
+  return targetClient;
 }

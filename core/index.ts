@@ -22,10 +22,16 @@ import {
   GetRoomListResponse,
   UploadMediaRequest,
   UploadMediaResponse,
-  UpdateFunc, RoomLoginRequest, RoomLoginResponse
+  UpdateFunc,
+  RoomLoginRequest,
+  RoomLoginResponse,
+  UserLoginResponse,
+  UserLoginRequest,
+  SocketStore,
+  DataReference,
+  StoreData
 } from "../index";
 import {CoreSocketImpl} from "./CoreSocketImpl";
-import {SocketStore} from "../@types/data";
 import {TargetClient} from "../_GitHub";
 
 export class SystemCollection {
@@ -43,7 +49,7 @@ export interface CoreSocketApi {
   ): Promise<string[]>;
   dbApiDelete(
     socket: any,
-    arg: DeleteDataRequest<any>,
+    arg: DeleteDataRequest,
     sendNotify?: boolean,
     nestNum?: number,
     nestNumTotal?: number
@@ -151,12 +157,14 @@ export interface CoreDbInner {
   addRefList(
     socket: any,
     collection: Collection<StoreData<any>>,
+    share: "room" | "room-mate" | "all" | "other",
     data: StoreData<any> | null | undefined,
     refInfo: { type: string; key: string }
   ): Promise<void>;
   deleteRefList(
     socket: any,
-    collectionArg: CollectionArg<any>,
+    collection: Collection<StoreData<any>>,
+    share: "room" | "room-mate" | "all" | "other",
     data: StoreData<any> | null | undefined,
     refInfo: { type: string; key: string }
   ): Promise<void>;
@@ -172,6 +180,7 @@ export interface CoreDbInner {
   updateMediaKeyRefList<T>(
     socket: any,
     cnPrefix: string,
+    share: "room" | "room-mate" | "all" | "other",
     data: T,
     type: string,
     key: string,
@@ -181,40 +190,18 @@ export interface CoreDbInner {
   dbUpdateOne<T>(
     filter: Filter<StoreData<T>>,
     updateData: Partial<StoreData<Partial<T>>>,
-    socket: any,
     collectionArg: CollectionArg<StoreData<T>>
   ): Promise<Collection<StoreData<T>>>;
   dbUpdateOneRaw<T>(
     filter: Filter<T>,
     updateData: Partial<T>,
-    socket: any,
     collectionArg: CollectionArg<T>
   ): Promise<Collection<T>>;
-  dbDeleteOne(
-    key: string,
-    socket: any,
-    collectionArg: CollectionArg<StoreData<any>>,
-  ): Promise<void>;
-  dbInsertOne<T>(
-    insertData: StoreData<T>,
-    socket: any,
-    collectionArg: CollectionArg<StoreData<T>>,
-  ): Promise<Collection<StoreData<T>>>;
-  dbInsertOneRaw<T>(
-    insertData: OptionalId<T>,
-    socket: any,
-    collectionArg: CollectionArg<T>,
-  ): Promise<Collection<T>>;
-  dbInsert<T>(
-    insertDataList: OptionalId<StoreData<T>>[],
-    socket: any,
-    collectionArg: CollectionArg<StoreData<T>>,
-  ): Promise<Collection<StoreData<T>>>;
-  dbInsertRaw<T>(
-    insertDataList: OptionalId<T>[],
-    socket: any,
-    collectionArg: CollectionArg<T>,
-  ): Promise<Collection<T>>;
+  dbDeleteOne(key: string, collectionArg: CollectionArg<StoreData<any>>): Promise<void>;
+  dbInsertOne<T>(insertData: StoreData<T>, collectionArg: CollectionArg<StoreData<T>>): Promise<Collection<StoreData<T>>>;
+  dbInsertOneRaw<T>(insertData: OptionalId<T>, collectionArg: CollectionArg<T>): Promise<Collection<T>>;
+  dbInsert<T>(insertDataList: OptionalId<StoreData<T>>[], collectionArg: CollectionArg<StoreData<T>>): Promise<Collection<StoreData<T>>>;
+  dbInsertRaw<T>(insertDataList: OptionalId<T>[], collectionArg: CollectionArg<T>): Promise<Collection<T>>;
   getAllCollection(cnPrefix: string): Promise<string[]>;
   getSocketInfo(socket: any): Promise<{
     socketCollection: Collection<SocketStore>;

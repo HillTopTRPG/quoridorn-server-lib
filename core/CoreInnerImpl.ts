@@ -1,7 +1,6 @@
 import {ApplicationError} from "../error/ApplicationError";
-import {RoomStore, SocketStore, TokenStore} from "../@types/data";
 import {CoreInner} from "./index";
-import {Core} from "../index";
+import {Core, RoomStore, SocketStore, TokenStore, UserStore} from "../index";
 
 export class CoreInnerImpl implements CoreInner {
   public constructor(private core: Core) {}
@@ -23,7 +22,6 @@ export class CoreInnerImpl implements CoreInner {
         userKey: null,
         connectTime: new Date()
       },
-      socket,
       this.core.COLLECTION_SOCKET
     )
   }

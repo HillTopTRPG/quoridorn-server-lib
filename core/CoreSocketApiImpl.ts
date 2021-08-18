@@ -7,7 +7,9 @@ import {
   SendDataRequest,
   UpdateDataRequest,
   UploadMediaRequest,
-  UploadMediaResponse
+  UploadMediaResponse,
+  UserLoginRequest,
+  UserLoginResponse
 } from "../index";
 import {CoreSocketApi} from "./index";
 import {Core, CreateRoomRequest, DeleteFunc, DeleteRoomRequest, InsertFunc, UpdateFunc} from "../index";
@@ -76,7 +78,7 @@ export class CoreSocketApiImpl implements CoreSocketApi {
 
   public async dbApiDelete(
     socket: any,
-    arg: DeleteDataRequest<any>,
+    arg: DeleteDataRequest,
     sendNotify?: boolean,
     nestNum?: number,
     nestNumTotal?: number

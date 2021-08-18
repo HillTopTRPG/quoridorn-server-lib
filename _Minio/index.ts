@@ -1,7 +1,5 @@
 import * as Minio from "minio";
-import {Core, MinioSetting} from "../index";
-import {UploadMediaInfo, UploadMediaRequest, UploadMediaResponse} from "../@types/socket";
-import {getFileHash} from "../util";
+import {Core, MediaStore, MinioSetting, UploadMediaInfo, UploadMediaRequest, UploadMediaResponse, getFileHash} from "../index";
 import * as path from "path";
 
 type MinioSettingRaw = {

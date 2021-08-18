@@ -1,6 +1,13 @@
 import {Db, MongoClient} from "mongodb";
-import {AddDirectRequest, DeleteDataRequest, UpdateDataRequest} from "../@types/socket";
-import {Core, DeleteFunc, InsertFunc, UpdateFunc} from "../index";
+import {
+  AddDirectRequest,
+  Core,
+  DeleteDataRequest,
+  DeleteFunc,
+  InsertFunc, StoreData,
+  UpdateDataRequest,
+  UpdateFunc
+} from "../index";
 
 export async function connectMongoDb(connectionString: string, dbNameSuffix: string): Promise<Db> {
   const client = await MongoClient.connect(connectionString);
@@ -34,11 +41,11 @@ export async function dbApiInsertDelegate<T>(
 }
 
 
-export async function dbApiDeleteDelegate<T>(
+export async function dbApiDeleteDelegate(
   core: Core,
   deleteFuncMap: Map<string, DeleteFunc>,
   socket: any,
-  arg: DeleteDataRequest<T>,
+  arg: DeleteDataRequest,
   sendNotify?: boolean,
   nestNum?: number,
   nestNumTotal?: number

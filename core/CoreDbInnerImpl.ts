@@ -1,8 +1,7 @@
 import {Collection, Filter, OptionalId} from "mongodb";
 import {ApplicationError} from "../error/ApplicationError";
 import {CollectionArg, CoreDbInner, SystemCollection} from "./index";
-import {SocketStore} from "../@types/data";
-import {Core} from "../index";
+import {Core, DataReference, MediaStore, SocketStore, StoreData} from "../index";
 const matchAll = require("match-all");
 
 export class CoreDbInnerImpl implements CoreDbInner {
@@ -86,23 +85,25 @@ export class CoreDbInnerImpl implements CoreDbInner {
   public async addRefList(
     socket: any,
     collection: Collection<StoreData<any>>,
+    share: "room" | "room-mate" | "all" | "other",
     data: StoreData<any> | null | undefined,
     refInfo: { type: string; key: string }
   ): Promise<void> {
     if (!data) return;
     if (data.refList.some(ref => ref.type === refInfo.type && ref.key === refInfo.key)) return;
     data.refList.push(refInfo);
-    await this.dbUpdateOne<any>(
-      { key: data.key },
-      { refList: data.refList },
+    await this.core._simpleDb.updateSimple<any>(
       socket,
-      collection
+      collection,
+      share,
+      { key: data.key, refList: data.refList }
     );
   }
 
   public async deleteRefList(
     socket: any,
-    collectionArg: CollectionArg<any>,
+    collection: Collection<StoreData<any>>,
+    share: "room" | "room-mate" | "all" | "other",
     data: StoreData<any> | null | undefined,
     refInfo: { type: string; key: string }
   ): Promise<void> {
@@ -112,11 +113,11 @@ export class CoreDbInnerImpl implements CoreDbInner {
     );
     if (index > -1) {
       data.refList.splice(index, 1);
-      await this.dbUpdateOne<any>(
-        { key: data.key },
-        { refList: data.refList },
+      await this.core._simpleDb.updateSimple<any>(
         socket,
-        collectionArg
+        collection,
+        share,
+        { key: data.key, refList: data.refList }
       );
     }
   }
@@ -169,6 +170,7 @@ export class CoreDbInnerImpl implements CoreDbInner {
   public async updateMediaKeyRefList<T>(
     socket: any,
     cnPrefix: string,
+    share: "room" | "room-mate" | "all" | "other",
     data: T,
     type: string,
     key: string,
@@ -186,9 +188,9 @@ export class CoreDbInnerImpl implements CoreDbInner {
             [ "media-list", cnPrefix]
           );
           if (operation === "add") {
-            await this.addRefList(socket, collection, data, { type, key });
+            await this.addRefList(socket, collection, share, data, { type, key });
           } else {
-            await this.deleteRefList(socket, collection, data, { type, key });
+            await this.deleteRefList(socket, collection, share, data, { type, key });
           }
         })
       );
@@ -211,7 +213,6 @@ export class CoreDbInnerImpl implements CoreDbInner {
   public async dbUpdateOne<T>(
     filter: Filter<StoreData<T>>,
     updateData: Partial<StoreData<Partial<T>>>,
-    socket: any,
     collectionArg: CollectionArg<StoreData<T>>
   ): Promise<Collection<StoreData<T>>> {
     const collection = await this.getCollection<StoreData<T>>(collectionArg, false);
@@ -233,7 +234,6 @@ export class CoreDbInnerImpl implements CoreDbInner {
   public async dbUpdateOneRaw<T>(
     filter: Filter<T>,
     updateData: Partial<T>,
-    socket: any,
     collectionArg: CollectionArg<T>
   ): Promise<Collection<T>> {
     const collection = await this.getCollection<T>(collectionArg, false);
@@ -248,7 +248,6 @@ export class CoreDbInnerImpl implements CoreDbInner {
 
   public async dbDeleteOne(
     key: string,
-    socket: any,
     collectionArg: CollectionArg<StoreData<any>>,
   ): Promise<void> {
     const collection = await this.getCollection<any>(collectionArg, false);
@@ -257,15 +256,13 @@ export class CoreDbInnerImpl implements CoreDbInner {
 
   public async dbInsertOne<T>(
     insertData: StoreData<T>,
-    socket: any,
     collectionArg: CollectionArg<StoreData<T>>,
   ): Promise<Collection<StoreData<T>>> {
-    return this.dbInsertOneRaw<StoreData<T>>(insertData, socket, collectionArg);
+    return this.dbInsertOneRaw<StoreData<T>>(insertData, collectionArg);
   }
 
   public async dbInsertOneRaw<T>(
     insertData: OptionalId<T>,
-    socket: any,
     collectionArg: CollectionArg<T>,
   ): Promise<Collection<T>> {
     const collection = await this.getCollection<T>(collectionArg, true);
@@ -275,15 +272,13 @@ export class CoreDbInnerImpl implements CoreDbInner {
 
   public async dbInsert<T>(
     insertDataList: OptionalId<StoreData<T>>[],
-    socket: any,
     collectionArg: CollectionArg<StoreData<T>>,
   ): Promise<Collection<StoreData<T>>> {
-    return this.dbInsertRaw<StoreData<T>>(insertDataList, socket, collectionArg);
+    return this.dbInsertRaw<StoreData<T>>(insertDataList, collectionArg);
   }
 
   public async dbInsertRaw<T>(
     insertDataList: OptionalId<T>[],
-    socket: any,
     collectionArg: CollectionArg<T>,
   ): Promise<Collection<T>> {
     const collection = await this.getCollection<T>(collectionArg, true);

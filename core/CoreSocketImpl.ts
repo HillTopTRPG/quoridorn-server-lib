@@ -1,6 +1,5 @@
-import {UploadMediaInfo} from "../@types/socket";
 import {CoreSocket} from "./index";
-import {Core} from "../index";
+import {Core, UploadMediaInfo} from "../index";
 
 export class CoreSocketImpl implements CoreSocket {
   public constructor(private core: Core) {}
