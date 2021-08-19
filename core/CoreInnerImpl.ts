@@ -1,14 +1,21 @@
 import {ApplicationError} from "../error/ApplicationError";
 import {CoreInner} from "./index";
-import {Core, RoomStore, SocketStore, TokenStore, UserStore} from "../index";
+import {ClientRoomData, ClientUserData, Core, RoomStore, SocketStore, StoreData, TokenStore, UserStore} from "../index";
 
 export class CoreInnerImpl implements CoreInner {
   public constructor(private core: Core) {}
 
   public async deleteExpiredToken(): Promise<number> {
-    const filter = { expires: { $lt: new Date() } };
     const collection = await this.core._dbInner.getCollection<TokenStore>(this.core.COLLECTION_TOKEN, false);
-    const result = await collection.deleteMany(filter);
+    const result = await collection.deleteMany({ expires: { $lt: new Date() } });
+    return result.deletedCount;
+  }
+
+  public async deleteTouchedRoom(): Promise<number> {
+    const collection = await this.core._dbInner.getCollection<StoreData<RoomStore>>(this.core.COLLECTION_ROOM, false);
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - 5);
+    const result = await collection.deleteMany({ $and: [{createTime: { $lt: d }}, {data: null}] });
     return result.deletedCount;
   }
 
@@ -57,20 +64,44 @@ export class CoreInnerImpl implements CoreInner {
         updateUserInfo
       );
 
+      // クライアントへの通知
+      await this.core.socket.emitSocketEvent<ClientUserData>(
+        socket,
+        "room-mate",
+        "notify-user-update",
+        null,
+        {
+          refList: userInfo.refList,
+          name: userInfo.data!.name,
+          type: userInfo.data!.type,
+          login: userInfo.data!.login
+        }
+      );
+
       if (userInfo.data!.login === 0) {
         const updateRoomInfo = { data: { memberNum: roomInfo.data!.memberNum } };
         roomInfo.data!.memberNum--;
         await roomCollection.updateOne(
           { key: socketInfo.roomKey },
-          updateRoomInfo
+          [{ $addFields: updateRoomInfo }]
         );
 
-        await this.core.socket.emitSocketEvent(
+        // クライアントへの通知
+        await this.core.socket.emitSocketEvent<ClientRoomData>(
           socket,
           "all",
           "notify-room-update",
           null,
-          updateRoomInfo
+          {
+            roomNo: roomInfo.order,
+            status: roomInfo.status,
+            operator: socket.id,
+            detail: {
+              roomName: roomInfo.data!.name,
+              memberNum: roomInfo.data!.memberNum,
+              extend: roomInfo.data!.extend
+            }
+          }
         );
       }
     }

@@ -29,7 +29,7 @@ export type RoomStore = {
   memberNum: number;
   roomCollectionPrefix: string;
   storageId: string;
-  roomPassword?: string;
+  roomPassword: string;
 };
 
 export type TokenStore = {
@@ -124,6 +124,14 @@ export type MediaStore = {
   dataLocation: "server" | "direct";
 };
 
+export type ClientUserData = {
+  key?: string;
+  refList: DataReference[];
+  name: string;
+  type: UserType;
+  login: number;
+}
+
 /**
  * userCCのデータ定義
  * ユーザ1人に関する情報
@@ -159,7 +167,7 @@ export type StoreData<T> = {
   createTime: Date;
   updateTime: Date | null;
   refList: DataReference[]; // このデータへの参照
-  data?: T;
+  data: T | null;
 };
 
 /**
@@ -225,20 +233,20 @@ export interface Core {
 
 export type AddDirectRequest<T> = {
   collectionSuffix: string;
-  share: "room" | "room-mate" | "all";
+  share: "room" | "room-mate";
   list: (Partial<StoreData<T>> & { data: T })[];
   force: boolean;
 };
 
 export type DeleteDataRequest = {
   collectionSuffix: string;
-  share: "room" | "room-mate" | "all";
+  share: "room" | "room-mate";
   list: string[];
 };
 
 export type UpdateDataRequest<T> = {
   collectionSuffix: string;
-  share: "room" | "room-mate" | "all";
+  share: "room" | "room-mate";
   list: (Partial<StoreData<Partial<T>>> & { key: string })[];
 };
 
@@ -268,8 +276,6 @@ export type RoomLoginRequest = {
   roomNo: number;
   roomPassword: string;
 };
-
-export type RoomLoginResponse = { userName: string; }[];
 
 export type UploadMediaRequest = {
   uploadMediaInfoList: UploadMediaInfo[];
@@ -322,7 +328,7 @@ export type InsertFunc = <T>(
   core: Core,
   socket: any,
   cnSuffix: string,
-  share: "room" | "room-mate" | "all",
+  share: "room" | "room-mate",
   force: boolean,
   data: Partial<StoreData<T>> & { data: T }
 ) => Promise<StoreData<T>>;
@@ -331,7 +337,7 @@ export type DeleteFunc = (
   core: Core,
   socket: any,
   cnSuffix: string,
-  share: "room" | "room-mate" | "all",
+  share: "room" | "room-mate",
   key: string
 ) => Promise<void>;
 
@@ -339,7 +345,7 @@ export type UpdateFunc = (
   core: Core,
   socket: any,
   cnSuffix: string,
-  share: "room" | "room-mate" | "all",
+  share: "room" | "room-mate",
   data: (Partial<StoreData<Partial<any>>> & { key: string })
 ) => Promise<void>;
 
@@ -445,13 +451,27 @@ export default async function bootUp(
     // socket.ioの各リクエストに対する処理の登録
     commonSocketApiFuncMap.forEach(core.socket.setEvent.bind(core.socket, socket));
     socketApiFuncMap.forEach(core.socket.setEvent.bind(core.socket, socket));
+
+    await core.socket.emitSocketEvent(
+      socket,
+      "self",
+      "server-ready",
+      null,
+      { ok: true }
+    );
   });
 
-  // 5分おきにトークン情報を整理する
+  // 1分おきにDBを監視
   setInterval(async () => {
-    const count = await core._inner.deleteExpiredToken();
-    console.log(`-- TOKEN REFRESH (${count}) --`);
-  }, 1000 * 60 * 5); // 5分
+    const tokenCount = await core._inner.deleteExpiredToken();
+    if (tokenCount) {
+      console.log(`-- TOKEN DELETE (num: ${tokenCount}) --`);
+    }
+    const roomCount = await core._inner.deleteTouchedRoom();
+    if (roomCount) {
+      console.log(`-- ROOM DELETE (num: ${roomCount}) --`);
+    }
+  }, 1000 * 60); // 1分
 
   console.log(`Quoridorn Server is Ready. (version: ${process.env.npm_package_version})`);
 }

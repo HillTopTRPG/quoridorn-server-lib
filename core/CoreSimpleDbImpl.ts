@@ -9,7 +9,7 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
   public async addSimple<T>(
     socket: any,
     collectionArg: CollectionArg<StoreData<T>>,
-    share: "room" | "room-mate" | "all" | "other",
+    share: "room" | "room-mate" | "all" | "other" | "none",
     force: boolean,
     data: Partial<StoreData<T>> & { data: T }
   ): Promise<StoreData<T>> {
@@ -95,7 +95,7 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
   public async deleteSimple<T>(
     socket: any,
     collectionArg: CollectionArg<StoreData<T>>,
-    share: "room" | "room-mate" | "all" | "other",
+    share: "room" | "room-mate" | "all" | "other" | "none",
     key: string
   ): Promise<void> {
     const { socketInfo } = await this.core._dbInner.getSocketInfo(socket);
@@ -144,7 +144,7 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
   public async updateSimple<T>(
     socket: any,
     collectionArg: CollectionArg<StoreData<T>>,
-    share: "room" | "room-mate" | "all" | "other",
+    share: "room" | "room-mate" | "all" | "other" | "none",
     data: (Partial<StoreData<Partial<T>>> & { key: string })
   ): Promise<void> {
     const {socketInfo} = await this.core._dbInner.getSocketInfo(socket);

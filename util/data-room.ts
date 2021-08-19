@@ -1,13 +1,13 @@
 import {ApplicationError} from "../error/ApplicationError";
 import {
   ClientRoomData,
+  ClientUserData,
   Core,
   CreateRoomRequest,
   DeleteRoomRequest,
   GetRoomListResponse,
   MediaStore,
   RoomLoginRequest,
-  RoomLoginResponse,
   RoomStore,
   SocketStore,
   StoreData,
@@ -27,12 +27,12 @@ export async function roomApiDeleteRoomDelegate(
   const { data, collection } = await core._dbInner.dbFindOne<RoomStore>({ order: arg.roomNo }, core.COLLECTION_ROOM);
 
   if (!data) throw new ApplicationError(`No such room. roomNo: ${arg.roomNo}`);
-  if (data.status === "initial-touched") throw new ApplicationError(`Room is creating. roomNo: ${arg.roomNo}`);
+  if (!data.data) throw new ApplicationError(`Room is creating. roomNo: ${arg.roomNo}`);
 
   // 部屋パスワードチェック
   let verifyResult: boolean;
   try {
-    verifyResult = await verify(data.data!.roomPassword!, arg.roomPassword);
+    verifyResult = await verify(data.data.roomPassword!, arg.roomPassword);
   } catch (err) {
     throw new SystemError(`Login verify fatal error. room-no=${arg.roomNo}`);
   }
@@ -40,6 +40,8 @@ export async function roomApiDeleteRoomDelegate(
   if (!verifyResult) throw new ApplicationError("Invalid password.")
 
   await collection.deleteOne({ key: data.key });
+
+  // クライアントへの通知
   await core.socket.emitSocketEvent(
     socket,
     "all",
@@ -49,8 +51,8 @@ export async function roomApiDeleteRoomDelegate(
   );
 
   const bucket = core.bucket;
-  const storageId = data.data!.storageId;
-  const cnPrefix = data.data!.roomCollectionPrefix;
+  const storageId = data.data.storageId;
+  const cnPrefix = data.data.roomCollectionPrefix;
 
   // メディアコレクションからメディアストレージの削除
   const {dataList} = await core._dbInner.dbFind<MediaStore>({}, ["media-list", cnPrefix]);
@@ -85,7 +87,7 @@ export async function roomApiLoginUserDelegate(
 
   // ユーザコレクションの取得とユーザ情報更新
   const cnPrefix = roomData.data!.roomCollectionPrefix;
-  const {data: userData, collection: userCollection} = await core._dbInner.dbFindOne<UserStore>({ data: { name: arg.name} }, ["user-list", cnPrefix]);
+  const {data: userData, collection: userCollection} = await core._dbInner.dbFindOne<UserStore>({ "data.name": arg.name }, ["user-list", cnPrefix]);
 
   let addRoomMember: boolean = true;
 
@@ -96,25 +98,61 @@ export async function roomApiLoginUserDelegate(
   let userLoginResponse: UserLoginResponse;
 
   if (!userData) {
+    console.log("User追加")
     const password = await hash(arg.password);
     const token = core.lib.makeKey();
 
-    const addedData = await core._simpleDb.addSimple(socket, userCollection, "room", true, {
-      data: {
-        name: arg.name,
-        type: arg.type,
-        token,
-        password,
-        login: 1,
-        isExported: false
+    const insertedData = await core._simpleDb.addSimple<UserStore>(
+      socket,
+      userCollection,
+      "none",
+      true,
+      {
+        data: {
+          name: arg.name,
+          type: arg.type,
+          login: 1,
+          token,
+          password,
+          isExported: false
+        }
       }
-    });
+    );
+
+    // クライアントへの通知
+    await core.socket.emitSocketEvent<ClientUserData>(
+      socket,
+      "self",
+      "notify-user-update",
+      null,
+      {
+        key: insertedData.key,
+        refList: insertedData.refList,
+        name: insertedData.data!.name,
+        type: insertedData.data!.type,
+        login: insertedData.data!.login
+      }
+    );
+    await core.socket.emitSocketEvent<ClientUserData>(
+      socket,
+      "room-mate",
+      "notify-user-update",
+      null,
+      {
+        refList: insertedData.refList,
+        name: insertedData.data!.name,
+        type: insertedData.data!.type,
+        login: insertedData.data!.login
+      }
+    );
 
     userLoginResponse = {
-      userKey: addedData.key,
+      userKey: insertedData.key,
       token
     };
   } else {
+    console.log("User更新")
+
     // ユーザが存在した場合
     const userKey = userData.key;
 
@@ -136,27 +174,72 @@ export async function roomApiLoginUserDelegate(
     userData.data!.login++;
     addRoomMember = userData.data!.login === 1;
 
-    await core._simpleDb.updateSimple(socket, userCollection, "room", {
+    await core._simpleDb.updateSimple(socket, userCollection, "none", {
       key: userKey,
       data: {
         login: userData.data!.login
       }
     });
 
-    await socketCollection.updateOne({ socketId: socket.id }, {
+    // クライアントへの通知
+    await core.socket.emitSocketEvent<ClientUserData>(
+      socket,
+      "self",
+      "notify-user-update",
+      null,
+      {
+        key: userKey,
+        refList: userData.refList,
+        name: userData.data!.name,
+        type: userData.data!.type,
+        login: userData.data!.login
+      }
+    );
+    await core.socket.emitSocketEvent<ClientUserData>(
+      socket,
+      "room-mate",
+      "notify-user-update",
+      null,
+      {
+        refList: userData.refList,
+        name: userData.data!.name,
+        type: userData.data!.type,
+        login: userData.data!.login
+      }
+    );
+
+    await socketCollection.updateOne({ socketId: socket.id }, [{ $addFields: {
       userKey
-    })
+    } }])
   }
 
   if (addRoomMember) {
     // ログインできたので部屋の入室人数を更新
     roomData.data!.memberNum++;
 
-    await roomCollection.updateOne({key: roomData.key}, {
+    await roomCollection.updateOne({key: roomData.key}, [{ $addFields: {
       data: {
         memberNum: roomData.data!.memberNum
       }
-    });
+    } }]);
+
+    // クライアントへの通知
+    await core.socket.emitSocketEvent<ClientRoomData>(
+      socket,
+      "all",
+      "notify-room-update",
+      null,
+      {
+        roomNo: roomData.order,
+        status: roomData.status,
+        operator: socket.id,
+        detail: {
+          roomName: roomData.data!.name,
+          memberNum: roomData.data!.memberNum,
+          extend: roomData.data!.extend
+        }
+      }
+    );
   }
 
   return userLoginResponse;
@@ -167,16 +250,21 @@ export async function roomApiLoginRoomDelegate(
   core: Core,
   socket: any,
   arg: RoomLoginRequest
-): Promise<RoomLoginResponse> {
+): Promise<ClientUserData[]> {
   const {data} = await core._dbInner.dbFindOne<RoomStore>({ order: arg.roomNo }, core.COLLECTION_ROOM);
   if (!data) throw new ApplicationError(`No such room.`, arg);
   if (!data.data) throw new ApplicationError(`Not yet created`, arg);
+
+  console.log("roomApiLoginRoomDelegate");
+  console.log(data.data.roomPassword);
+  console.log(JSON.stringify(data, null, "  "));
 
   // 部屋パスワードチェック
   let verifyResult;
   try {
     verifyResult = await verify(data.data.roomPassword!, arg.roomPassword);
   } catch (err) {
+    console.error(err);
     throw new SystemError(`Verify process fatal error. room-no=${arg.roomNo}`);
   }
 
@@ -192,13 +280,19 @@ export async function roomApiLoginRoomDelegate(
   };
 
   try {
-    await socketCollection.updateOne({ socketId: socket.id }, updateInfo);
+    await socketCollection.updateOne({ socketId: socket.id }, [{ $addFields: updateInfo }]);
   } catch (err) {
     throw new ApplicationError(`Failure update doc.`, updateInfo);
   }
 
+  // ユーザ一覧を返却
   const {dataList} = await core._dbInner.dbFind<UserStore>({}, ["user-list", cnPrefix]);
-  return dataList.map(d => ({userName: d.data!.name}));
+  return dataList.map(d => ({
+    login: d.data!.login,
+    refList: d.refList,
+    name: d.data!.name,
+    type: d.data!.type
+  }));
 }
 
 export async function roomApiGetRoomListDelegate(
@@ -300,6 +394,7 @@ export async function roomApiCreateRoomDelegate(
     memberNum: 0,
     roomCollectionPrefix,
     storageId,
+    // roomPassword: 'ThisIsPassword?'
     roomPassword: arg.roomPassword
   };
 
@@ -310,8 +405,9 @@ export async function roomApiCreateRoomDelegate(
     updateTime: new Date()
   };
   try {
-    await collection.updateOne({ key: arg.roomKey }, updateRoomInfo);
+    await collection.updateOne({ key: arg.roomKey }, [{ $addFields: updateRoomInfo }]);
 
+    // クライアントへの通知
     await core.socket.emitSocketEvent<ClientRoomData>(
       socket,
       "all",
@@ -329,16 +425,17 @@ export async function roomApiCreateRoomDelegate(
       }
     );
   } catch (err) {
+    console.error(err);
     await failure(`Failure update roomInfo doc.`);
   }
 
   const socketCollection = await core._dbInner.getCollection(core.COLLECTION_SOCKET, false);
-  await socketCollection.updateOne({ socketId: socket.id }, {
+  await socketCollection.updateOne({ socketId: socket.id }, [{ $addFields: {
     roomKey: arg.roomKey,
     roomNo: data.order,
     roomCollectionPrefix,
     storageId
-  });
+  } }]);
 }
 
 
@@ -364,6 +461,7 @@ export async function roomApiTouchRoomDelegate(
     data: null
   }, core.COLLECTION_ROOM);
 
+  // クライアントへの通知
   await core.socket.emitSocketEvent<ClientRoomData>(
     socket,
     "all",

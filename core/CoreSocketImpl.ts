@@ -46,11 +46,12 @@ export class CoreSocketImpl implements CoreSocket {
 
   public async emitSocketEvent<T>(
     socket: any,
-    sendTarget: "self" | "room" | "room-mate" | "all" | "other" | string[],
+    sendTarget: "self" | "room" | "room-mate" | "all" | "other" | "none" | string[],
     event: string,
     error: any,
     payload: T
   ): Promise<void> {
+    if (sendTarget === "none") return;
     if (typeof sendTarget !== "string") {
       await this.core.lib.gatlingAsync<void>(sendTarget.map(async t =>
         this.core.io.sockets.to(t).emit(event, error, payload)
@@ -67,7 +68,7 @@ export class CoreSocketImpl implements CoreSocket {
       return await socket.broadcast.emit(event, error, payload);
     }
 
-    const {socketInfoList} = await this.core._dbInner.getRoomMateSocketInfoList(socket.id);
+    const {socketInfoList} = await this.core._dbInner.getRoomMateSocketInfoList(socket);
     await this.core.lib.gatlingAsync(
       socketInfoList
         .filter((_, idx) => sendTarget === "room" ? true : idx > 0)

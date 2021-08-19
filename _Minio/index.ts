@@ -70,7 +70,7 @@ export async function mediaApiUploadDelegate(
 
     const hash = info.dataLocation === "server" ? getFileHash(info.arrayBuffer!) : info.url;
     const {data: duplicateMedia} = await core._dbInner.dbFindOne<MediaStore>(
-      {data: { hash }},
+      { "data.hash": hash },
       ["media-list", cnPrefix]
     );
 

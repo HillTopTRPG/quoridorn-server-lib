@@ -1,9 +1,9 @@
 import {
   AddDirectRequest,
+  ClientUserData,
   DeleteDataRequest,
   GetRoomListResponse,
   RoomLoginRequest,
-  RoomLoginResponse,
   SendDataRequest,
   UpdateDataRequest,
   UploadMediaRequest,
@@ -52,11 +52,11 @@ export class CoreSocketApiImpl implements CoreSocketApi {
     return roomApiGetRoomListDelegate(this.core, socket, arg);
   }
 
-  public async roomApiGetLoginRoom(socket: any, arg: RoomLoginRequest): Promise<RoomLoginResponse> {
+  public async roomApiLoginRoom(socket: any, arg: RoomLoginRequest): Promise<ClientUserData[]> {
     return roomApiLoginRoomDelegate(this.core, socket, arg);
   }
 
-  public async roomApiGetLoginUser(socket: any, arg: UserLoginRequest): Promise<UserLoginResponse> {
+  public async roomApiLoginUser(socket: any, arg: UserLoginRequest): Promise<UserLoginResponse> {
     return roomApiLoginUserDelegate(this.core, socket, arg);
   }
 

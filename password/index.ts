@@ -14,10 +14,11 @@ export async function hash(
   planeText: string,
   option: any = {}
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
+  const hashRaw = (await (new Promise((resolve, reject) => {
     if (!("saltRounds " in option) || typeof option.saltRounds !== "number") option.saltRounds = 10;
     bcrypt.hash(planeText, option.saltRounds, generateDefaultPromiseCallback(resolve, reject));
-  });
+  }))) as string;
+  return "hashed:" + hashRaw;
 }
 
 /**
@@ -29,8 +30,9 @@ export async function verify(
   hash: string,
   planeText: string,
 ): Promise<boolean> {
+  const hashRaw = hash.replace(/^hashed:/, "");
   return new Promise((resolve, reject) => {
-    bcrypt.compare(planeText, hash, generateDefaultPromiseCallback(resolve, reject));
+    bcrypt.compare(planeText, hashRaw, generateDefaultPromiseCallback(resolve, reject));
   });
 }
 

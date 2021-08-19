@@ -79,13 +79,13 @@ export class CoreDbInnerImpl implements CoreDbInner {
   ): Promise<{ collection: Collection<StoreData<T>>; maxOrder: number }> {
     const collection = await this.getCollection<StoreData<T>>(collectionArg, true);
     const list = (await collection.find().sort("order", -1).limit(1).toArray());
-    return { collection, maxOrder: list.length ? -1 : list[0].order };
+    return { collection, maxOrder: list.length ? list[0].order : -1 };
   }
 
   public async addRefList(
     socket: any,
     collection: Collection<StoreData<any>>,
-    share: "room" | "room-mate" | "all" | "other",
+    share: "room" | "room-mate" | "all" | "other" | "none",
     data: StoreData<any> | null | undefined,
     refInfo: { type: string; key: string }
   ): Promise<void> {
@@ -103,7 +103,7 @@ export class CoreDbInnerImpl implements CoreDbInner {
   public async deleteRefList(
     socket: any,
     collection: Collection<StoreData<any>>,
-    share: "room" | "room-mate" | "all" | "other",
+    share: "room" | "room-mate" | "all" | "other" | "none",
     data: StoreData<any> | null | undefined,
     refInfo: { type: string; key: string }
   ): Promise<void> {
@@ -170,7 +170,7 @@ export class CoreDbInnerImpl implements CoreDbInner {
   public async updateMediaKeyRefList<T>(
     socket: any,
     cnPrefix: string,
-    share: "room" | "room-mate" | "all" | "other",
+    share: "room" | "room-mate" | "all" | "other" | "none",
     data: T,
     type: string,
     key: string,
@@ -218,16 +218,17 @@ export class CoreDbInnerImpl implements CoreDbInner {
     const collection = await this.getCollection<StoreData<T>>(collectionArg, false);
     const originalData = await collection.findOne<StoreData<T>>(filter, {});
     if (!originalData) throw new ApplicationError("No such original data.");
-    const upData: StoreData<T> = {
-      ...originalData,
-      ...updateData,
-      updateTime: new Date()
-    } as StoreData<T>;
-    upData.data = {
-      ...originalData.data,
-      ...(updateData.data || {})
-    } as T;
-    await collection.updateOne(filter, upData);
+    updateData.updateTime = new Date();
+    // const upData: StoreData<T> = {
+    //   ...originalData,
+    //   ...updateData,
+    //   updateTime: new Date()
+    // } as StoreData<T>;
+    // upData.data = {
+    //   ...originalData.data,
+    //   ...(updateData.data || {})
+    // } as T;
+    await collection.updateOne(filter, [{ $addFields: updateData }]);
     return collection;
   }
 
@@ -237,12 +238,12 @@ export class CoreDbInnerImpl implements CoreDbInner {
     collectionArg: CollectionArg<T>
   ): Promise<Collection<T>> {
     const collection = await this.getCollection<T>(collectionArg, false);
-    const originalData = await collection.findOne<T>(filter, {});
-    const upData: T = {
-      ...originalData,
-      ...updateData
-    } as T
-    await collection.updateOne(filter, upData);
+    // const originalData = await collection.findOne<T>(filter, {});
+    // const upData: T = {
+    //   ...originalData,
+    //   ...updateData
+    // } as T
+    await collection.updateOne(filter, [{ $addFields: updateData }]);
     return collection;
   }
 
