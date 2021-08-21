@@ -40,7 +40,7 @@ export class CoreSocketApiImpl implements CoreSocketApi {
     return roomApiTouchRoomDelegate(this.core, socket, arg);
   }
 
-  public async roomApiCreateRoom(socket: any, arg: CreateRoomRequest): Promise<void> {
+  public async roomApiCreateRoom(socket: any, arg: CreateRoomRequest): Promise<ClientUserData[]> {
     return roomApiCreateRoomDelegate(this.core, socket, arg);
   }
 

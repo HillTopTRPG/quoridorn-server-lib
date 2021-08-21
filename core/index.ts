@@ -62,7 +62,7 @@ export interface CoreSocketApi {
   ): Promise<void>;
   socketApiEmitEvent(socket: any, arg: SendDataRequest): Promise<void>;
   roomApiTouchRoom(socket: any, arg: number): Promise<string>;
-  roomApiCreateRoom(socket: any, arg: CreateRoomRequest): Promise<void>;
+  roomApiCreateRoom(socket: any, arg: CreateRoomRequest): Promise<ClientUserData[]>;
   roomApiDeleteRoom(socket: any, arg: DeleteRoomRequest): Promise<void>;
   roomApiGetRoomList(socket: any, arg: string): Promise<GetRoomListResponse>;
   roomApiLoginRoom(socket: any, arg: RoomLoginRequest): Promise<ClientUserData[]>;

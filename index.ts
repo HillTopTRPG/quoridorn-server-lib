@@ -26,6 +26,7 @@ export type RoomStore = {
   bcdiceVersion: string;
   system: string;
   extend?: RoomInfoExtend; // 一時的措置
+  loggedIn: number;
   memberNum: number;
   roomCollectionPrefix: string;
   storageId: string;
@@ -43,13 +44,20 @@ export type TokenStore = {
 }
 
 export type SocketStore = {
+  // 挿入時に設定
   socketId: string;
-  roomKey: string | null;
-  roomNo: number | null;
-  roomCollectionPrefix: string | null;
-  storageId: string | null;
-  userKey: string | null;
+  // 挿入時に設定
   connectTime: Date;
+  // タッチ時に設定
+  roomKey: string | null;
+  // タッチ時に設定
+  roomNo: number | null;
+  // 部屋作成／ログイン時に設定
+  roomCollectionPrefix: string | null;
+  // 部屋作成／ログイン時に設定
+  storageId: string | null;
+  // ユーザログイン時に設定
+  userKey: string | null;
 }
 export type IconClass =
   | "icon-warning"
@@ -267,6 +275,7 @@ export type ClientRoomData = {
   operator: string; // socket.id
   detail: null | {
     roomName: string;
+    loggedIn: number;
     memberNum: number;
     extend?: RoomInfoExtend;
   }
@@ -309,7 +318,6 @@ export type MinioSetting = {
 };
 
 export type CreateRoomRequest = {
-  roomKey: string;
   roomPassword: string;
   name: string;
   bcdiceServer: string;
@@ -430,13 +438,17 @@ export default async function bootUp(
   restApiResisterList.forEach(r => r(expressServer, core));
 
   core.io.on("connection", async (socket: any) => {
-    core.log.accessLog(socket.id, "CONNECTED");
+    // socket.ioの各リクエストに対する処理の登録
+    commonSocketApiFuncMap.forEach(core.socket.setEvent.bind(core.socket, socket));
+    socketApiFuncMap.forEach(core.socket.setEvent.bind(core.socket, socket));
+
+    core.log.accessLog(socket, "CONNECTED");
 
     // 接続情報に追加
     await core._inner.socketIn(socket);
 
     socket.on("disconnect", async () => {
-      core.log.accessLog(socket.id, "DISCONNECTED");
+      core.log.accessLog(socket, "DISCONNECTED");
       try {
         // 接続情報から削除
         await core._inner.socketOut(socket);
@@ -447,10 +459,6 @@ export default async function bootUp(
     socket.on("error", () => {
       console.log("error", socket.id);
     });
-
-    // socket.ioの各リクエストに対する処理の登録
-    commonSocketApiFuncMap.forEach(core.socket.setEvent.bind(core.socket, socket));
-    socketApiFuncMap.forEach(core.socket.setEvent.bind(core.socket, socket));
 
     await core.socket.emitSocketEvent(
       socket,

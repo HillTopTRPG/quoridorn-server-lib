@@ -15,7 +15,7 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
   ): Promise<StoreData<T>> {
     const { socketInfo } = await this.core._dbInner.getSocketInfo(socket);
     const cnPrefix = socketInfo.roomCollectionPrefix;
-    if (!cnPrefix) throw new ApplicationError("Not yet logged in.");
+    if (!cnPrefix) throw new ApplicationError("You are not logged in to the room yet. (1)");
     const {collection, maxOrder} = await this.core._dbInner.getMaxOrder<T>(collectionArg);
     const { cnSuffix } = this.core.lib.splitCollectionName(collection.collectionName);
 
@@ -100,7 +100,7 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
   ): Promise<void> {
     const { socketInfo } = await this.core._dbInner.getSocketInfo(socket);
     const cnPrefix = socketInfo.roomCollectionPrefix;
-    if (!cnPrefix) throw new ApplicationError("Not yet logged in.");
+    if (!cnPrefix) throw new ApplicationError("You are not logged in to the room yet. (2)");
     const { data, collection } = await this.core._dbInner.dbFindOne<T>({ key }, collectionArg);
     const { cnSuffix } = this.core.lib.splitCollectionName(collection.collectionName);
     const msgArg = { collection: collection.collectionName, key };
@@ -150,7 +150,7 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
     const {socketInfo} = await this.core._dbInner.getSocketInfo(socket);
     const cnPrefix = socketInfo.roomCollectionPrefix;
     if (!cnPrefix)
-      throw new ApplicationError("Not yet login.");
+      throw new ApplicationError("You are not logged in to the room yet. (3)");
     const { data: originalData, collection } = await this.core._dbInner.dbFindOne<T>({ key: data.key }, collectionArg);
     if (!originalData)
       throw new ApplicationError(`No such data.`, { arg: JSON.stringify(collectionArg)});

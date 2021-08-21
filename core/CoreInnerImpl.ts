@@ -15,28 +15,62 @@ export class CoreInnerImpl implements CoreInner {
     const collection = await this.core._dbInner.getCollection<StoreData<RoomStore>>(this.core.COLLECTION_ROOM, false);
     const d = new Date();
     d.setMinutes(d.getMinutes() - 5);
-    const result = await collection.deleteMany({ $and: [{createTime: { $lt: d }}, {data: null}] });
-    return result.deletedCount;
+    const r = await collection.find({ $and: [{createTime: { $lt: d }}, {data: null}] }).toArray();
+    await collection.deleteMany({ $and: [{createTime: { $lt: d }}, {data: null}] });
+
+    if (r.length) {
+      // クライアントへの通知
+      await this.core.socket.emitSocketEvent(
+        null,
+        "all",
+        "notify-room-delete",
+        null,
+        r.map(r => r.order)
+      );
+    }
+    return r.length;
   }
 
   public async socketIn(socket: any): Promise<void> {
     await this.core._dbInner.dbInsertOneRaw<SocketStore>({
         socketId: socket.id,
-        roomKey: null,
+        connectTime: new Date(),
         roomNo: null,
+        roomKey: null,
         roomCollectionPrefix: null,
         storageId: null,
-        userKey: null,
-        connectTime: new Date()
+        userKey: null
       },
       this.core.COLLECTION_SOCKET
     )
   }
 
   public async socketOut(socket: any): Promise<void> {
+    console.log("socketOut")
     const {socketInfo, socketCollection} = await this.core._dbInner.getSocketInfo(socket);
+    console.log(JSON.stringify(socketInfo, null, "  "))
+
+    if (socketInfo.roomKey && !socketInfo.roomCollectionPrefix) {
+      // タッチした部屋を解放
+
+      const {data: roomData, collection: roomCollection} = await this.core._dbInner.dbFindOne({key: socketInfo.roomKey}, this.core.COLLECTION_ROOM);
+      if (roomData) {
+        await roomCollection.deleteOne({ key: socketInfo.roomKey });
+
+        // クライアントへの通知
+        await this.core.socket.emitSocketEvent(
+          socket,
+          "all",
+          "notify-room-delete",
+          null,
+          [roomData.order]
+        );
+      }
+    }
 
     if (socketInfo.roomKey && socketInfo.userKey) {
+      // ログインした部屋からログアウト
+      console.log("ログアウト処理")
       const {
         data: roomInfo,
         collection: roomCollection
@@ -54,7 +88,9 @@ export class CoreInnerImpl implements CoreInner {
       if (!userInfo)
         throw new ApplicationError(`No such user. user-key=${socketInfo.userKey}`);
 
+      console.log("ログイン数変化")
       userInfo.data!.login--;
+      console.log(userInfo.data!.login);
 
       const updateUserInfo = { key: socketInfo.userKey, data: {login: userInfo.data!.login} };
       await this.core._simpleDb.updateSimple(
@@ -79,12 +115,14 @@ export class CoreInnerImpl implements CoreInner {
       );
 
       if (userInfo.data!.login === 0) {
-        const updateRoomInfo = { data: { memberNum: roomInfo.data!.memberNum } };
-        roomInfo.data!.memberNum--;
+        console.log("部屋人数変化")
+        console.log(roomInfo.data!.loggedIn)
+        roomInfo.data!.loggedIn--;
         await roomCollection.updateOne(
           { key: socketInfo.roomKey },
-          [{ $addFields: updateRoomInfo }]
+          [{ $addFields: { data: {loggedIn: roomInfo.data!.loggedIn} } }] // TODO
         );
+        console.log(roomInfo.data!.loggedIn)
 
         // クライアントへの通知
         await this.core.socket.emitSocketEvent<ClientRoomData>(
@@ -98,6 +136,7 @@ export class CoreInnerImpl implements CoreInner {
             operator: socket.id,
             detail: {
               roomName: roomInfo.data!.name,
+              loggedIn: roomInfo.data!.loggedIn,
               memberNum: roomInfo.data!.memberNum,
               extend: roomInfo.data!.extend
             }
