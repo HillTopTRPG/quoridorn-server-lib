@@ -11,11 +11,13 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
     collectionArg: CollectionArg<StoreData<T>>,
     share: "room" | "room-mate" | "all" | "other" | "none",
     force: boolean,
+    isServerInner: boolean,
     data: Partial<StoreData<T>> & { data: T }
   ): Promise<StoreData<T>> {
     const { socketInfo } = await this.core._dbInner.getSocketInfo(socket);
     const cnPrefix = socketInfo.roomCollectionPrefix;
     if (!cnPrefix) throw new ApplicationError("You are not logged in to the room yet. (1)");
+    if (!isServerInner && !socketInfo.userKey) throw new ApplicationError("You are not logged in to the room yet. (5)");
     const {collection, maxOrder} = await this.core._dbInner.getMaxOrder<T>(collectionArg);
     const { cnSuffix } = this.core.lib.splitCollectionName(collection.collectionName);
 
@@ -34,7 +36,7 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
     const ownerType = data.ownerType !== undefined ? data.ownerType : "user-list";
     const owner = data.owner || socketInfo.userKey;
     const order = data.order !== undefined ? data.order : maxOrder + 1;
-    const now = new Date();
+    const now = Date.now();
     const permission = data.permission || PERMISSION_DEFAULT;
     const key = data.key !== undefined && !originalData ? data.key : uuid.v4();
     const refList: DataReference[] = [];
@@ -70,8 +72,8 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
       owner,
       permission,
       status: "added",
-      createTime: now,
-      updateTime: now,
+      createDateTime: now,
+      updateDateTime: now,
       refList,
       data: data.data
     };
@@ -201,7 +203,7 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
       ...originalData,
       ...data,
       status: "modified",
-      updateTime: new Date()
+      updateDateTime: Date.now()
     } as StoreData<T>;
     if (data.data !== undefined) {
       updateInfo.data = {

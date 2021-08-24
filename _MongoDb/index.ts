@@ -8,10 +8,19 @@ import {
   UpdateDataRequest,
   UpdateFunc
 } from "../index";
+import {ApplicationError} from "../error/ApplicationError";
 
 export async function connectMongoDb(connectionString: string, dbNameSuffix: string): Promise<Db> {
   const client = await MongoClient.connect(connectionString);
   return client.db(`quoridorn-${dbNameSuffix}`);
+}
+
+export async function dbApiGetDelegate(core: Core, socket: any, arg: string): Promise<StoreData<unknown>[]> {
+  const { socketInfo } = await core._dbInner.getSocketInfo(socket);
+  const cnPrefix = socketInfo.roomCollectionPrefix;
+  if (!socketInfo.userKey || !cnPrefix) throw new ApplicationError("You are not logged in to the room yet. (4)");
+  const {dataList} = await core._dbInner.dbFind({}, [arg, cnPrefix]);
+  return dataList;
 }
 
 export async function dbApiInsertDelegate<T>(
@@ -27,7 +36,7 @@ export async function dbApiInsertDelegate<T>(
 
   const callFunc =
     insertFuncMap.get(cnSuffix)?.bind(null, core, socket, cnSuffix, arg.share, arg.force) ||
-    core._simpleDb.addSimple.bind(core._simpleDb, socket, [cnSuffix, socket], arg.share, arg.force);
+    core._simpleDb.addSimple.bind(core._simpleDb, socket, [cnSuffix, socket], arg.share, arg.force, false);
 
   // 非同期処理を直列で実行していく
   const dataList = await core.lib.gatlingAsync<StoreData<unknown>>(

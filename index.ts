@@ -40,14 +40,14 @@ export type TokenStore = {
   roomNo: number | null;
   storageId: string | null;
   userKey: string | null;
-  expires: Date;
+  expires: number;
 }
 
 export type SocketStore = {
   // 挿入時に設定
   socketId: string;
   // 挿入時に設定
-  connectTime: Date;
+  connectTime: number;
   // タッチ時に設定
   roomKey: string | null;
   // タッチ時に設定
@@ -172,8 +172,8 @@ export type StoreData<T> = {
     | "initial-touched"
     | "added"
     | "modified";
-  createTime: Date;
-  updateTime: Date | null;
+  createDateTime: number;
+  updateDateTime: number;
   refList: DataReference[]; // このデータへの参照
   data: T | null;
 };
@@ -273,6 +273,8 @@ export type ClientRoomData = {
   roomNo: number;
   status: "initial-touched" | "added" | "modified";
   operator: string; // socket.id
+  createDateTime: number;
+  updateDateTime: number;
   detail: null | {
     roomName: string;
     loggedIn: number;

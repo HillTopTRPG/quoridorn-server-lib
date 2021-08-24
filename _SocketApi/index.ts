@@ -2,6 +2,7 @@ import {SocketApiFunc} from "../index";
 
 const map = new Map<string, SocketApiFunc>();
 
+map.set("db-api-get", (core, socket, arg) => core.socketApi.dbApiGet(socket, arg));
 map.set("db-api-insert", (core, socket, arg) => core.socketApi.dbApiInsert(socket, arg));
 map.set("db-api-delete", (core, socket, arg) => core.socketApi.dbApiDelete(socket, arg));
 map.set("db-api-update", (core, socket, arg) => core.socketApi.dbApiUpdate(socket, arg));

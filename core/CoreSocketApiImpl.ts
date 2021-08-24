@@ -5,6 +5,7 @@ import {
   GetRoomListResponse,
   RoomLoginRequest,
   SendDataRequest,
+  StoreData,
   UpdateDataRequest,
   UploadMediaRequest,
   UploadMediaResponse,
@@ -13,7 +14,7 @@ import {
 } from "../index";
 import {CoreSocketApi} from "./index";
 import {Core, CreateRoomRequest, DeleteFunc, DeleteRoomRequest, InsertFunc, UpdateFunc} from "../index";
-import {dbApiDeleteDelegate, dbApiInsertDelegate, dbApiUpdateDelegate} from "../_MongoDb";
+import {dbApiDeleteDelegate, dbApiGetDelegate, dbApiInsertDelegate, dbApiUpdateDelegate} from "../_MongoDb";
 import {mediaApiUploadDelegate} from "../_Minio";
 import {
   roomApiCreateRoomDelegate,
@@ -62,6 +63,10 @@ export class CoreSocketApiImpl implements CoreSocketApi {
 
   public async mediaApiUpload(socket: any, arg: UploadMediaRequest): Promise<UploadMediaResponse> {
     return mediaApiUploadDelegate(this.core, socket, arg);
+  }
+
+  public async dbApiGet(socket: any, arg: string): Promise<StoreData<unknown>[]> {
+    return dbApiGetDelegate(this.core, socket, arg);
   }
 
   public async dbApiInsert<T>(

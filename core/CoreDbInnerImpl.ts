@@ -218,16 +218,7 @@ export class CoreDbInnerImpl implements CoreDbInner {
     const collection = await this.getCollection<StoreData<T>>(collectionArg, false);
     const originalData = await collection.findOne<StoreData<T>>(filter, {});
     if (!originalData) throw new ApplicationError("No such original data.");
-    updateData.updateTime = new Date();
-    // const upData: StoreData<T> = {
-    //   ...originalData,
-    //   ...updateData,
-    //   updateTime: new Date()
-    // } as StoreData<T>;
-    // upData.data = {
-    //   ...originalData.data,
-    //   ...(updateData.data || {})
-    // } as T;
+    updateData.updateDateTime = Date.now();
     await collection.updateOne(filter, [{ $addFields: updateData }]);
     return collection;
   }
@@ -238,11 +229,6 @@ export class CoreDbInnerImpl implements CoreDbInner {
     collectionArg: CollectionArg<T>
   ): Promise<Collection<T>> {
     const collection = await this.getCollection<T>(collectionArg, false);
-    // const originalData = await collection.findOne<T>(filter, {});
-    // const upData: T = {
-    //   ...originalData,
-    //   ...updateData
-    // } as T
     await collection.updateOne(filter, [{ $addFields: updateData }]);
     return collection;
   }

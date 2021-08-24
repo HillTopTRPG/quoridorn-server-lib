@@ -39,6 +39,7 @@ export class SystemCollection {
 
 export interface CoreSocketApi {
   mediaApiUpload(socket: any, arg: UploadMediaRequest): Promise<UploadMediaResponse>;
+  dbApiGet(socket: any, arg: string): Promise<StoreData<unknown>[]>;
   dbApiInsert<T>(
     socket: any,
     arg: AddDirectRequest<T>,
@@ -91,6 +92,7 @@ export interface CoreSimpleDb {
     collectionArg: CollectionArg<StoreData<T>>,
     share: "room" | "room-mate" | "all" | "other" | "none",
     force: boolean,
+    isServerInner: boolean,
     data: Partial<StoreData<T>> & { data: T }
   ): Promise<StoreData<T>>;
   deleteSimple<T>(

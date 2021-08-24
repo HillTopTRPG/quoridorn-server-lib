@@ -48,6 +48,8 @@ export async function roomApiGetRoomListDelegate(
         roomNo: d.order,
         status: d.status,
         operator: socket.id,
+        createDateTime: d.createDateTime,
+        updateDateTime: d.updateDateTime,
         detail: d.data ? {
           roomName: d.data.name,
           loggedIn: d.data.loggedIn,
@@ -126,6 +128,7 @@ export async function roomApiTouchRoomDelegate(
 
   await socketCollection.updateOne({ socketId: socket.id }, [{$addFields: {roomKey: key, roomNo: arg, roomCollectionPrefix: null}}]);
 
+  const now = Date.now();
   await core._dbInner.dbInsertOne<null>({
     key,
     collection: "room",
@@ -135,8 +138,8 @@ export async function roomApiTouchRoomDelegate(
     ownerType: null,
     permission: null,
     status: "initial-touched",
-    createTime: new Date(),
-    updateTime: null,
+    createDateTime: now,
+    updateDateTime: now,
     data: null
   }, core.COLLECTION_ROOM);
 
@@ -150,6 +153,8 @@ export async function roomApiTouchRoomDelegate(
       roomNo: arg,
       status: "initial-touched",
       operator: socket.id,
+      createDateTime: now,
+      updateDateTime: now,
       detail: null
     }
   );
@@ -235,7 +240,7 @@ export async function roomApiCreateRoomDelegate(
       roomPassword: arg.roomPassword
     },
     status: "added",
-    updateTime: new Date()
+    updateDateTime: Date.now()
   };
   try {
     await collection.updateOne({ key: roomKey }, [{ $addFields: updateRoomInfo }]);
@@ -250,6 +255,8 @@ export async function roomApiCreateRoomDelegate(
         roomNo: data.order,
         status: data.status,
         operator: socket.id,
+        createDateTime: data.createDateTime,
+        updateDateTime: updateRoomInfo.updateDateTime!,
         detail: {
           roomName: updateRoomInfo.data!.name,
           loggedIn: updateRoomInfo.data!.loggedIn,
@@ -390,6 +397,7 @@ export async function roomApiLoginUserDelegate(
       userCollection,
       "none",
       true,
+      true,
       {
         data: {
           name: arg.name,
@@ -451,11 +459,13 @@ export async function roomApiLoginUserDelegate(
   if (addLoggedInFlag) roomData.data!.loggedIn++;
   if (addMemberNumFlag) roomData.data!.memberNum++;
   if (addLoggedInFlag || addMemberNumFlag) {
+    const updateDateTime = Date.now();
     await roomCollection.updateOne({key: roomData.key}, [{ $addFields: { // TODO
       data: {
         memberNum: roomData.data!.memberNum,
         loggedIn: roomData.data!.loggedIn
-      }
+      },
+      updateDateTime
     } }]);
 
     // クライアントへの通知
@@ -468,6 +478,8 @@ export async function roomApiLoginUserDelegate(
         roomNo: roomData.order,
         status: roomData.status,
         operator: socket.id,
+        createDateTime: roomData.createDateTime,
+        updateDateTime: updateDateTime,
         detail: {
           roomName: roomData.data!.name,
           loggedIn: roomData.data!.loggedIn,

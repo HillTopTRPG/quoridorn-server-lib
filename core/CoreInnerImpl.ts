@@ -7,7 +7,7 @@ export class CoreInnerImpl implements CoreInner {
 
   public async deleteExpiredToken(): Promise<number> {
     const collection = await this.core._dbInner.getCollection<TokenStore>(this.core.COLLECTION_TOKEN, false);
-    const result = await collection.deleteMany({ expires: { $lt: new Date() } });
+    const result = await collection.deleteMany({ expires: { $lt: Date.now() } });
     return result.deletedCount;
   }
 
@@ -15,8 +15,9 @@ export class CoreInnerImpl implements CoreInner {
     const collection = await this.core._dbInner.getCollection<StoreData<RoomStore>>(this.core.COLLECTION_ROOM, false);
     const d = new Date();
     d.setMinutes(d.getMinutes() - 5);
-    const r = await collection.find({ $and: [{createTime: { $lt: d }}, {data: null}] }).toArray();
-    await collection.deleteMany({ $and: [{createTime: { $lt: d }}, {data: null}] });
+    const time = d.getTime();
+    const r = await collection.find({ $and: [{createDateTime: { $lt: time }}, {data: null}] }).toArray();
+    await collection.deleteMany({ $and: [{createDateTime: { $lt: time }}, {data: null}] });
 
     if (r.length) {
       // クライアントへの通知
@@ -34,7 +35,7 @@ export class CoreInnerImpl implements CoreInner {
   public async socketIn(socket: any): Promise<void> {
     await this.core._dbInner.dbInsertOneRaw<SocketStore>({
         socketId: socket.id,
-        connectTime: new Date(),
+        connectTime: Date.now(),
         roomNo: null,
         roomKey: null,
         roomCollectionPrefix: null,
@@ -118,9 +119,10 @@ export class CoreInnerImpl implements CoreInner {
         console.log("部屋人数変化")
         console.log(roomInfo.data!.loggedIn)
         roomInfo.data!.loggedIn--;
+        const updateDateTime = Date.now();
         await roomCollection.updateOne(
           { key: socketInfo.roomKey },
-          [{ $addFields: { data: {loggedIn: roomInfo.data!.loggedIn} } }] // TODO
+          [{ $addFields: { data: {loggedIn: roomInfo.data!.loggedIn}, updateDateTime } }]
         );
         console.log(roomInfo.data!.loggedIn)
 
@@ -134,6 +136,8 @@ export class CoreInnerImpl implements CoreInner {
             roomNo: roomInfo.order,
             status: roomInfo.status,
             operator: socket.id,
+            createDateTime: roomInfo.createDateTime,
+            updateDateTime: updateDateTime,
             detail: {
               roomName: roomInfo.data!.name,
               loggedIn: roomInfo.data!.loggedIn,
