@@ -7,10 +7,12 @@ export class CoreSocketImpl implements CoreSocket {
   public setEvent<T, U>(
     socket: any,
     func: (core: Core, socket: any, arg: T) => Promise<U>,
-    eventName: string
+    eventName: string,
+    resultEventGetter: (arg: T) => string | null
   ): void {
-    const resultEvent = `result-${eventName}`;
     socket.on(eventName, async (arg: T) => {
+      const resultEventRaw = resultEventGetter(arg)
+      const resultEvent = resultEventRaw !== null ? resultEventRaw : `result-${eventName}`;
       console.log(`socket.on ${eventName}`);
       const logArg = arg ? JSON.parse(JSON.stringify(arg)) : null;
       if (eventName === "upload-media") {
@@ -26,7 +28,7 @@ export class CoreSocketImpl implements CoreSocket {
       try {
         const result = await func(this.core, socket, arg);
         this.core.log.accessLog(socket, eventName, "END  ", result);
-        socket.emit(resultEvent, null, result);
+        if (resultEvent) socket.emit(resultEvent, null, result);
       } catch (err) {
         // アクセスログは必ず閉じる
         this.core.log.accessLog(socket, eventName, "ERROR");
@@ -35,7 +37,7 @@ export class CoreSocketImpl implements CoreSocket {
         const errorMessage = "message" in err ? err.message : err;
         this.core.log.errorLog(socket, eventName, errorMessage);
 
-        socket.emit(resultEvent, err, null);
+        if (resultEvent) socket.emit(resultEvent, err, null);
       }
     });
   }

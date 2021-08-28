@@ -364,6 +364,7 @@ export type SocketApiFunc = (
   socket: any,
   arg: any
 ) => Promise<any>;
+export type SocketApiResistInfo = [SocketApiFunc, (arg: any) => string | null]
 
 export type Interoperability = {
   server: string;
@@ -414,7 +415,7 @@ export default async function bootUp(
   insertFuncMap: Map<string, InsertFunc>,
   deleteFuncMap: Map<string, DeleteFunc>,
   updateFuncMap: Map<string, UpdateFunc>,
-  socketApiFuncMap: Map<string, SocketApiFunc>,
+  socketApiFuncMap: Map<string, SocketApiResistInfo>,
   restApiResisterList: RestApiResister[]
 ) {
   const db = await connectMongoDb(serverSetting.mongodbConnectionStrings, dbNameSuffix);
@@ -441,8 +442,12 @@ export default async function bootUp(
 
   core.io.on("connection", async (socket: any) => {
     // socket.ioの各リクエストに対する処理の登録
-    commonSocketApiFuncMap.forEach(core.socket.setEvent.bind(core.socket, socket));
-    socketApiFuncMap.forEach(core.socket.setEvent.bind(core.socket, socket));
+    commonSocketApiFuncMap.forEach((value, key) => {
+      core.socket.setEvent(socket, value[0], key, value[1])
+    });
+    socketApiFuncMap.forEach((value, key) => {
+      core.socket.setEvent(socket, value[0], key, value[1])
+    });
 
     core.log.accessLog(socket, "CONNECTED");
 

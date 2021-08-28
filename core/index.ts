@@ -74,7 +74,8 @@ export interface CoreSocket {
   setEvent<T, U>(
     socket: any,
     func: (core: Core, socket: any, arg: T) => Promise<U>,
-    eventName: string
+    eventName: string,
+    resultEventGetter: (arg: T) => string | null
   ): void;
   notifyProgress(socket: any, all: number, current: number): Promise<void>;
   emitSocketEvent<T>(
