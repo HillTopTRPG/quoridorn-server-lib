@@ -19,7 +19,6 @@ export class CoreSocketImpl implements CoreSocket {
         logArg.uploadMediaInfoList.forEach((info: UploadMediaInfo) => {
           info.imageSrc = "[Binary Array]";
           if (info.dataLocation === "server") {
-            delete info.blob;
             delete info.arrayBuffer;
           }
         });
@@ -27,7 +26,7 @@ export class CoreSocketImpl implements CoreSocket {
       this.core.log.accessLog(socket, eventName, "START", logArg);
       try {
         const result = await func(this.core, socket, arg);
-        this.core.log.accessLog(socket, eventName, "END  ", result);
+        this.core.log.accessLog(socket, resultEvent, "END  ", result);
         if (resultEvent) socket.emit(resultEvent, null, result);
       } catch (err) {
         // アクセスログは必ず閉じる

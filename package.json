@@ -1,6 +1,6 @@
 {
   "name": "quoridorn-server-lib",
-  "version": "0.0.72",
+  "version": "0.0.78",
   "description": "",
   "main": "dist/index.js",
   "private": false,

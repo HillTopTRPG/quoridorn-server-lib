@@ -57,7 +57,6 @@ export async function mediaApiUploadDelegate(
   const { socketInfo } = (await core._dbInner.getSocketInfo(socket));
   const storageId = socketInfo.storageId!;
   const cnPrefix = socketInfo.roomCollectionPrefix;
-  const mediaListCCName = `${cnPrefix}-DATA-media-list`;
 
   type CheckedInfo = {
     key: string;
@@ -106,7 +105,18 @@ export async function mediaApiUploadDelegate(
     if (!info.existKey && info.rawInfo.dataLocation === "server") {
       mediaFileId = core.lib.makeKey() + path.extname(info.rawInfo.rawPath);
       const filePath = path.join(storageId, mediaFileId);
-      await core.s3Client!.putObject(core.bucket, filePath, info.rawInfo.arrayBuffer!);
+      const mediaData = info.rawInfo.arrayBuffer!;
+      const m = mediaData.match(/^data:(.+);base64,/)
+      if (m) {
+        const contentType = m[1] || ''
+        const buf = Buffer.from(info.rawInfo.arrayBuffer!.replace(m[0], ""),'base64')
+        const data = {
+          Key: info.rawInfo.key,
+          ContentEncoding: 'base64',
+          ContentType: contentType
+        };
+        await core.s3Client.putObject(core.bucket, filePath, buf, data);
+      }
       // XXX 以下の方法だと、「https://~~」が「http:/~~」になってしまうことが判明したので、単純連結に変更
       // urlList.push(path.join(accessUrl, filePath));
       info.rawInfo.url = core.accessUrl + filePath;
@@ -124,7 +134,7 @@ export async function mediaApiUploadDelegate(
   // mediaListに追加
   if (newList.length) {
     await core.socketApi.dbApiInsert<MediaStore>(socket, {
-      collectionSuffix: mediaListCCName,
+      collectionSuffix: 'media-list',
       list: newList
         .map(data => ({
           ...arg.option,

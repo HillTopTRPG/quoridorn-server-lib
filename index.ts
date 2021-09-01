@@ -114,7 +114,6 @@ export type UploadMediaInfo = MediaStore & { key?: string } & (
   | { dataLocation: "direct" }
   | {
   dataLocation: "server";
-  blob?: Blob;
   arrayBuffer?: string;
 }
   );
